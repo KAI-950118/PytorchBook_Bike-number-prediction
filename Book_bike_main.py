@@ -6,64 +6,22 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 # %matplotlib inline # cannot use in Pycharm
 
+## load data from local
 data_path = 'hour.csv'
 rides = pd.read_csv(data_path)
 rides.head()
-counts = rides['cnt'][:50]
+
+## Check row data
+# counts = rides['cnt'][:50]
 # x = np.arange(len(counts), dtype=float)
 # y = np.array(counts, dtype=float)
-# # row data print
-# # plt.figure(figsize=(10, 7))
-# # plt.plot(x, y, 'o-')
-# # plt.xlabel("X")
-# # plt.ylabel("Y")
-# # plt.show()
-#
-# # fail method
-# X = Variable(torch.FloatTensor(x)/len(counts))
-# Y = Variable(torch.FloatTensor(y))
-#
-# sz = 10
-# weights = Variable(torch.randn(1, sz), requires_grad=True)
-# biases = Variable(torch.randn(sz), requires_grad=True)
-# weights_2 = Variable(torch.randn(sz, 1), requires_grad=True)
-# learning_rate = 0.01
-# losses = []
-#
-# for i in range(400000):
-#     hidden = X.expand(sz, len(x)).t() * weights.expand(len(x), sz) + biases.expand(len(x), sz)
-#     hidden = torch.sigmoid(hidden)
-#     predictions = hidden.mm(weights_2)
-#     loss = torch.mean((predictions - Y) ** 2)
-#     losses.append(loss.data.numpy())
-#
-#     if i % 10000 == 0:
-#         print("loss:", loss)
-#
-#     loss.backward()
-#     weights.data.add_(-learning_rate * weights.grad.data)
-#     biases.data.add_(-learning_rate * biases.grad.data)
-#     weights_2.data.add_(-learning_rate * weights_2.grad.data)
-#
-#     weights.grad.data.zero_()
-#     biases.grad.data.zero_()
-#     weights_2.grad.data.zero_()
-#
-# # print("finish")
-# # plt.plot(losses)
-# # plt.xlabel("Epoch")
-# # plt.ylabel("Loss")
-# # plt.show()
-#
 # plt.figure(figsize=(10, 7))
-# xplot,= plt.plot(X.data.numpy(), Y.data.numpy(), 'o')
-# yplot,= plt.plot(X.data.numpy(), predictions.data.numpy())
+# plt.plot(x, y, 'o-')
 # plt.xlabel("X")
 # plt.ylabel("Y")
-# plt.legend([xplot, yplot], ['Data', "predictions"])
 # plt.show()
 
-## Neural Network
+## Data pre-process
 dummy_feilds = ['season', 'weathersit', 'mnth', 'hr', 'weekday']
 # print(rides)
 for each in dummy_feilds:
@@ -97,19 +55,20 @@ Y = np.reshape(Y, [len(Y), 1]) #Trans to Y*1 matrix
 # print(Y)
 losses = []
 
+## Regression Neural Network
 input_size = feature.shape[1]
 hidden_size = 10
 output_size = 1
 batch_size = 128
-
 neu = torch.nn.Sequential(
     torch.nn.Linear(input_size, hidden_size),
     torch.nn.Sigmoid(),
     torch.nn.Linear(hidden_size, output_size),
 )
 cost = torch.nn.MSELoss()
-
 optimizer = torch.optim.SGD(neu.parameters(), lr=0.01)
+
+## Training start~~
 for i in range(1000):
     batch_loss = []
     for start in range(0, len(X), batch_size):
@@ -131,6 +90,7 @@ plt.xlabel("epoch")
 plt.ylabel("MSE")
 plt.show()
 
+## Testing start~~
 targets = test_targets['cnt']
 targets = targets.values.reshape([len(targets), 1])
 targets = targets.astype(float)
@@ -141,6 +101,7 @@ yyy = Variable(torch.FloatTensor(targets))
 predict = neu(xxx)
 predict = predict.data.numpy()
 
+## Show prediction result
 fig, ax = plt.subplots(figsize=(10, 7))
 mean, std = scaled_feature['cnt']
 ax.plot(predict * std + mean, label='Prediction')
@@ -155,48 +116,49 @@ ax.set_xticks(np.arange(len(dates))[12::24])
 _ = ax.set_xticklabels(dates[12::24], rotation=45)
 plt.show()
 
-def feature(X, net):
-    X = Variable(torch.from_numpy(X).type(torch.FloatTensor), requires_grad=False)
-    dic = dict(net.named_parameters())
-    weights = dic["0.weight"]
-    biases = dic['0.bias']
-    h = torch.sigmoid(X.mm(weights.t())+biases.expand(len(X), len(biases)))
-    return h
-
-bool1 = rides['dteday'] == '2012-12-22'
-bool2 = rides['dteday'] == '2012-12-23'
-bool3 = rides['dteday'] == '2012-12-24'
-bools = [any(tup) for tup in zip(bool1, bool2, bool3)]
-
-
-subset = test_feature.loc[rides[bools].index]
-subtargets = test_targets.loc[rides[bools].index]
-subtargets = subtargets['cnt']
-subtargets = subtargets.values.reshape([len(subtargets), 1])
-
-results = feature(subset.values, neu).data.numpy()
-predict = neu(Variable(torch.FloatTensor(subset.values))).data.numpy()
-mean, std = scaled_feature['cnt']
-predict = predict * std + mean
-subtargets = subtargets * std + mean
-
-fig, ax = plt.subplots(figsize=(8, 6))
-ax.plot(results[:, :], '.:', alpha=0.1)
-ax.plot((predict - min(predict)) / (max(predict) - min(predict)), 'bo-', label='Prediction')
-ax.plot((subtargets - min(predict)) / (max(predict) - min(predict)), 'ro-', label='Real')
-ax.plot(results[:, 6], '.:', alpha=1, label='Neuro 7')
-ax.set_xlim(right=len(predict))
-ax.legend()
-plt.ylabel('Normalize Values')
-dates = pd.to_datetime(rides.loc[subset.index]['dteday'])
-dates = dates.apply(lambda d: d.strftime('%b %d'))
-ax.set_xticks(np.arange(len(dates))[12::24])
-_ = ax.set_xticklabels(dates[12::24], rotation=45)
-plt.show()
-
-dic = dict(neu.named_parameters())
-weights = dic['0.weight']
-plt.plot(weights.data.numpy()[4, :], 'o-')
-plt.xlabel('input Neurons')
-plt.ylabel('Weight')
-plt.show()
+## Analysis
+# def feature(X, net):
+#     X = Variable(torch.from_numpy(X).type(torch.FloatTensor), requires_grad=False)
+#     dic = dict(net.named_parameters())
+#     weights = dic["0.weight"]
+#     biases = dic['0.bias']
+#     h = torch.sigmoid(X.mm(weights.t())+biases.expand(len(X), len(biases)))
+#     return h
+#
+# bool1 = rides['dteday'] == '2012-12-22'
+# bool2 = rides['dteday'] == '2012-12-23'
+# bool3 = rides['dteday'] == '2012-12-24'
+# bools = [any(tup) for tup in zip(bool1, bool2, bool3)]
+#
+#
+# subset = test_feature.loc[rides[bools].index]
+# subtargets = test_targets.loc[rides[bools].index]
+# subtargets = subtargets['cnt']
+# subtargets = subtargets.values.reshape([len(subtargets), 1])
+#
+# results = feature(subset.values, neu).data.numpy()
+# predict = neu(Variable(torch.FloatTensor(subset.values))).data.numpy()
+# mean, std = scaled_feature['cnt']
+# predict = predict * std + mean
+# subtargets = subtargets * std + mean
+#
+# fig, ax = plt.subplots(figsize=(8, 6))
+# ax.plot(results[:, :], '.:', alpha=0.1)
+# ax.plot((predict - min(predict)) / (max(predict) - min(predict)), 'bo-', label='Prediction')
+# ax.plot((subtargets - min(predict)) / (max(predict) - min(predict)), 'ro-', label='Real')
+# ax.plot(results[:, 6], '.:', alpha=1, label='Neuro 7')
+# ax.set_xlim(right=len(predict))
+# ax.legend()
+# plt.ylabel('Normalize Values')
+# dates = pd.to_datetime(rides.loc[subset.index]['dteday'])
+# dates = dates.apply(lambda d: d.strftime('%b %d'))
+# ax.set_xticks(np.arange(len(dates))[12::24])
+# _ = ax.set_xticklabels(dates[12::24], rotation=45)
+# plt.show()
+#
+# dic = dict(neu.named_parameters())
+# weights = dic['0.weight']
+# plt.plot(weights.data.numpy()[4, :], 'o-')
+# plt.xlabel('input Neurons')
+# plt.ylabel('Weight')
+# plt.show()
